@@ -2,8 +2,8 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
+	"net/url"
 )
 
 type CharacterWindow struct {
@@ -81,8 +81,10 @@ type Character struct {
 }
 
 func (c *Client) GetCharacterItems(accountName string, characterName string) (*CharacterWindow, error) {
-	characterQuery := fmt.Sprintf("character=%s&accountName=%s", characterName, accountName)
-	response, err := c.CallAPI("character-window/get-items", characterQuery)
+	query := url.Values{}
+	query.Set("character", characterName)
+	query.Set("accountName", accountName)
+	response, err := c.CallAPI("character-window/get-items", query.Encode())
 	if err != nil {
 		return nil, err
 	}

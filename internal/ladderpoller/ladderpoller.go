@@ -14,8 +14,7 @@ import (
 type LadderPoller struct {
 	Ladder     Ladder
 	LadderName string
-	StopChan   chan bool
-	Updated    bool
+	ticker     *time.Ticker
 	*api.Client
 }
 
@@ -53,37 +52,31 @@ func NewLadderPoller(ladderName string) *LadderPoller {
 	return &LadderPoller{
 		Ladder:     Ladder{},
 		LadderName: ladderName,
-		StopChan:   make(chan bool),
 		Client:     client,
 	}
 }
 
-func (l LadderPoller) Poll() {
-	ticker := time.NewTicker(60 * time.Second)
-	defer ticker.Stop()
+func (l *LadderPoller) Poll(duration time.Duration) {
+	if duration < time.Minute {
+		log.Printf("Reset poll duration from %s to 1 minute\n", duration)
+		duration = time.Minute
+	}
+	l.ticker = time.NewTicker(duration)
 
 	go func() {
-		for {
+		for range l.ticker.C {
 			if err := l.refreshLadder(); err != nil {
 				log.Fatal(err)
-			}
-			l.Updated = true
-			select {
-			case <-ticker.C:
-				continue
-			case <-l.StopChan:
-				ticker.Stop()
-				return
 			}
 		}
 	}()
 }
 
-func (l LadderPoller) StopPoll() {
-	close(l.StopChan)
+func (l *LadderPoller) StopPoll() {
+	l.ticker.Stop()
 }
 
-func (l LadderPoller) refreshLadder() error {
+func (l *LadderPoller) refreshLadder() error {
 	response, err := l.CallAPI(fmt.Sprintf("ladders/%s", l.LadderName), "limit=45&offset=0")
 	if err != nil {
 		return err
