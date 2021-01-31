@@ -82,7 +82,7 @@ type Character struct {
 
 func (c *Client) GetCharacterItems(accountName string, characterName string) (*CharacterWindow, error) {
 	characterQuery := fmt.Sprintf("character=%s&accountName=%s", characterName, accountName)
-	response, err := c.callAPI("www.pathofexile.com", "character-window/get-items", characterQuery)
+	response, err := c.CallAPI("character-window/get-items", characterQuery)
 	if err != nil {
 		return nil, err
 	}

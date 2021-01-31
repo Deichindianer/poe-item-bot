@@ -7,18 +7,22 @@ import (
 
 type Client struct {
 	HTTPClient *http.Client
+	Host       string
+	Scheme     string
 }
 
 func New() *Client {
 	return &Client{
 		HTTPClient: http.DefaultClient,
+		Host:       "api.pathofexile.com",
+		Scheme:     "http",
 	}
 }
 
-func (c *Client) callAPI(host string, path string, query string) (*http.Response, error) {
+func (c *Client) CallAPI(path string, query string) (*http.Response, error) {
 	callURL := url.URL{
-		Scheme:   "http",
-		Host:     host,
+		Scheme:   c.Scheme,
+		Host:     c.Host,
 		Path:     path,
 		RawQuery: query,
 	}

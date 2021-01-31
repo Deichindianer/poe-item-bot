@@ -1,34 +1,21 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"fmt"
+	"time"
 
-	"github.com/Deichindianer/poe-item-bot/internal/itemAPI"
+	"github.com/Deichindianer/poe-item-bot/internal/ladderpoller"
 )
 
 func main() {
-	// poe := api.New()
-	// ladder, err := poe.GetLadder("SSF Ritual HC")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Printf("Got ladder with %d entries!", ladder.Total)
-	// character, err := poe.GetCharacterItems("Zizaran", "ZizaranSmarter")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, item := range character.Items {
-	// 	searchString := "Movement Speed"
-	// 	for _, mod := range item.ExplicitMods {
-	// 		if strings.Contains(mod, searchString) {
-	// 			fmt.Printf("%s -- %+v\n", item.Type, item.ExplicitMods)
-	// 		}
-	// 	}
-	// }
-	i, err := itemAPI.NewItemAPI()
-	if err != nil {
-		log.Fatal(err)
+	ladderPoller := ladderpoller.NewLadderPoller("SSF Ritual HC")
+	ladderPoller.Poll()
+
+	i := 0
+	for i < 5 {
+		fmt.Printf("Ladder cached since: %+v\n", ladderPoller.Ladder.CachedSince)
+		fmt.Printf("Ladder updated? %+v\n", ladderPoller.Updated)
+		time.Sleep(60 * time.Second)
 	}
-	log.Fatal(http.ListenAndServe("localhost:8080", i))
+	ladderPoller.StopPoll()
 }
