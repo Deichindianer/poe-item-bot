@@ -3,7 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
-	"poe-item-bot/internal/itemAPI"
+
+	"github.com/Deichindianer/poe-item-bot/internal/itemAPI"
 )
 
 func main() {
@@ -25,6 +26,9 @@ func main() {
 	// 		}
 	// 	}
 	// }
-	i := itemAPI.NewItemAPI()
+	i, err := itemAPI.NewItemAPI()
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Fatal(http.ListenAndServe("localhost:8080", i))
 }
