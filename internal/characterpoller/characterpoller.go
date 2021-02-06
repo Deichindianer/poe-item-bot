@@ -92,7 +92,9 @@ func (c *CharacterPoller) Poll(duration time.Duration) {
 		duration = time.Minute
 	}
 	c.ticker = time.NewTicker(duration)
-
+	if err := c.refreshAllCharacterItems(); err != nil {
+		log.Println(err)
+	}
 	go func() {
 		for range c.ticker.C {
 			if err := c.refreshAllCharacterItems(); err != nil {

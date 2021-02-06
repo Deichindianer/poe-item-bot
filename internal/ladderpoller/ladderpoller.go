@@ -62,6 +62,7 @@ func (l *LadderPoller) Poll(duration time.Duration) {
 		duration = time.Minute
 	}
 	l.ticker = time.NewTicker(duration)
+	log.Println("Refreshing ladder...")
 	if err := l.refreshLadder(); err != nil {
 		log.Printf("%s", err)
 	}

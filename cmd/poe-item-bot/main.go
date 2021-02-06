@@ -1,41 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"time"
+	"log"
+	"net/http"
 
-	"github.com/Deichindianer/poe-item-bot/internal/characterpoller"
-	"github.com/Deichindianer/poe-item-bot/internal/ladderpoller"
+	"github.com/Deichindianer/poe-item-bot/internal/itemservice"
 )
 
 func main() {
-	fmt.Println("Starting ladder poll")
-	lp := ladderpoller.NewLadderPoller("SSF Ritual HC")
-	lp.Poll(time.Minute)
-	// wait for the ladderPoller to do some work for testing
-	time.Sleep(5)
-	var pollList []characterpoller.PollCharacter
-	for _, entry := range lp.Ladder.Entries {
-		pollList = append(
-			pollList,
-			characterpoller.PollCharacter{
-				AccountName:   entry.Account.Name,
-				CharacterName: entry.Character.Name,
-			},
-		)
-	}
-	fmt.Printf("Length of pollList: %d", len(pollList))
-	fmt.Println("Finished ladder poll")
-	characterPoller := characterpoller.NewCharacterPoller(pollList)
-	characterPoller.Poll(time.Minute)
-	lp.StopPoll()
-	i := 0
-	for i < 5 {
-		fmt.Println("Checking for characters...")
-		for _, char := range characterPoller.Characters {
-			fmt.Printf("Current character: %s\n", char.Character.Name)
-		}
-		time.Sleep(60 * time.Second)
-	}
-	characterPoller.StopPoll()
+	is := itemservice.NewItemService("SSF Ritual HC")
+	go is.Init()
+	log.Fatal(http.ListenAndServe(":8080", is))
 }
