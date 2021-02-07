@@ -6,13 +6,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/Deichindianer/poe-item-bot/pkg/api"
 )
 
 type CharacterPoller struct {
-	PollList   []PollCharacter
+	PollList   []*PollCharacter
 	Characters []*CharacterWindow
 	ticker     *time.Ticker
 	*api.Client
@@ -24,8 +25,9 @@ type PollCharacter struct {
 }
 
 type CharacterWindow struct {
-	Items     []Item    `json:"items"`
-	Character Character `json:"character"`
+	Items       []Item    `json:"items"`
+	Character   Character `json:"character"`
+	AccountName string
 }
 
 type Socket struct {
@@ -76,7 +78,12 @@ type Character struct {
 	LastActive bool   `json:"lastActive"`
 }
 
-func NewCharacterPoller(pollList []PollCharacter) *CharacterPoller {
+type refreshResult struct {
+	characterWindow *CharacterWindow
+	err             error
+}
+
+func NewCharacterPoller(pollList []*PollCharacter) *CharacterPoller {
 	client := api.New()
 	client.Scheme = "http"
 	client.Host = "www.pathofexile.com"
@@ -93,11 +100,13 @@ func (c *CharacterPoller) Poll(duration time.Duration) {
 	}
 	c.ticker = time.NewTicker(duration)
 	if err := c.refreshAllCharacterItems(); err != nil {
+		log.Printf("got error: %s", err)
 		log.Println(err)
 	}
 	go func() {
 		for range c.ticker.C {
 			if err := c.refreshAllCharacterItems(); err != nil {
+				log.Printf("got error: %s", err)
 				log.Println(err)
 			}
 		}
@@ -110,34 +119,52 @@ func (c *CharacterPoller) StopPoll() {
 
 func (c *CharacterPoller) refreshAllCharacterItems() error {
 	start := time.Now()
-	var tmpCharacters []*CharacterWindow
+	var wg sync.WaitGroup
+	charactersChan := make(chan *refreshResult, len(c.PollList))
 	for _, pollItem := range c.PollList {
-		tmpCharWindow, err := c.getCharacterWindow(pollItem.AccountName, pollItem.CharacterName)
-		if err != nil {
-			return err
-		}
-		tmpCharacters = append(tmpCharacters, tmpCharWindow)
+		wg.Add(1)
+		go func(wg *sync.WaitGroup, pollItem *PollCharacter) {
+			c.getCharacterWindow(charactersChan, pollItem.AccountName, pollItem.CharacterName)
+			log.Println("Got the characterWindow")
+			wg.Done()
+		}(&wg, pollItem)
 	}
-	c.Characters = tmpCharacters
+	log.Println("Waiting for refreshCharacterWindow routines to finish")
+	wg.Wait()
+	log.Println("refreshCharacterWindow finished!")
+	close(charactersChan)
+	// for result := range charactersChan {
+	// 	if result.err != nil {
+	// 		log.Println(result.err)
+	// 		continue
+	// 	}
+	// 	c.Characters = append(c.Characters, result.characterWindow)
+	// }
 	fmt.Printf("Duration of RefreshAllCharacterItems: %s\n", time.Since(start))
 	return nil
 }
 
-func (c *CharacterPoller) getCharacterWindow(accountName, characterName string) (*CharacterWindow, error) {
-	start := time.Now()
+func (c *CharacterPoller) getCharacterWindow(rc chan<- *refreshResult, accountName, characterName string) {
 	query := url.Values{}
 	query.Set("character", characterName)
 	query.Set("accountName", accountName)
 	response, err := c.CallAPI("character-window/get-items", query.Encode())
 	if err != nil {
-		return nil, err
+		log.Printf("got error: %s", err)
+		rc <- &refreshResult{nil, err}
 	}
 	responseBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		log.Printf("got error: %s", err)
+		rc <- &refreshResult{nil, err}
 	}
 	var characterWindow CharacterWindow
 	err = json.Unmarshal(responseBytes, &characterWindow)
-	fmt.Printf("Duration of getCharacterWindow: %s\n", time.Since(start))
-	return &characterWindow, nil
+	if err != nil {
+		log.Printf("got error: %s", err)
+		rc <- &refreshResult{nil, err}
+	}
+	characterWindow.AccountName = accountName
+	log.Printf("char window successfully pulled, seding to channel")
+	rc <- &refreshResult{&characterWindow, nil}
 }

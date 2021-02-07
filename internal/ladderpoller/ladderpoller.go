@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"github.com/Deichindianer/poe-item-bot/pkg/api"
@@ -14,6 +16,8 @@ import (
 type LadderPoller struct {
 	Ladder     Ladder
 	LadderName string
+	Limit      int
+	Offset     int
 	ticker     *time.Ticker
 	*api.Client
 }
@@ -45,13 +49,15 @@ type Account struct {
 	Realm string `json:"realm"`
 }
 
-func NewLadderPoller(ladderName string) *LadderPoller {
+func NewLadderPoller(ladderName string, limit, offset int) *LadderPoller {
 	client := api.New()
 	client.Scheme = "http"
 	client.Host = "api.pathofexile.com"
 	return &LadderPoller{
 		Ladder:     Ladder{},
 		LadderName: ladderName,
+		Limit:      limit,
+		Offset:     offset,
 		Client:     client,
 	}
 }
@@ -63,13 +69,13 @@ func (l *LadderPoller) Poll(duration time.Duration) {
 	}
 	l.ticker = time.NewTicker(duration)
 	log.Println("Refreshing ladder...")
-	if err := l.refreshLadder(); err != nil {
-		log.Printf("%s", err)
+	if err := l.refreshLadder(l.Limit, l.Offset); err != nil {
+		log.Println(err)
 	}
 	go func() {
 		for range l.ticker.C {
-			if err := l.refreshLadder(); err != nil {
-				log.Printf("%s", err)
+			if err := l.refreshLadder(l.Limit, l.Offset); err != nil {
+				log.Println(err)
 			}
 		}
 	}()
@@ -79,8 +85,11 @@ func (l *LadderPoller) StopPoll() {
 	l.ticker.Stop()
 }
 
-func (l *LadderPoller) refreshLadder() error {
-	response, err := l.CallAPI(fmt.Sprintf("ladders/%s", l.LadderName), "limit=45&offset=0")
+func (l *LadderPoller) refreshLadder(limit, offset int) error {
+	query := url.Values{}
+	query.Set("limit", strconv.Itoa(limit))
+	query.Set("offset", strconv.Itoa(offset))
+	response, err := l.CallAPI(fmt.Sprintf("ladders/%s", l.LadderName), query.Encode())
 	if err != nil {
 		return err
 	}

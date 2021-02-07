@@ -2,9 +2,9 @@ package itemservice
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,16 +21,13 @@ type ItemService struct {
 
 type SearchResult struct {
 	Metadata interface{}
-	Items    []struct {
-		Type         string
-		ExplicitMods []string
-	}
+	Items    []characterpoller.Item
 }
 
-func NewItemService(ladderName string) *ItemService {
+func NewItemService(ladderName string, limit, offset int) *ItemService {
 	i := new(ItemService)
 	i.characterPoller = characterpoller.NewCharacterPoller(nil)
-	i.ladderPoller = ladderpoller.NewLadderPoller(ladderName)
+	i.ladderPoller = ladderpoller.NewLadderPoller(ladderName, limit, offset)
 	i.mux = gin.New()
 	i.mux.GET("/search", i.search)
 	return i
@@ -39,7 +36,7 @@ func NewItemService(ladderName string) *ItemService {
 func (i *ItemService) Init() error {
 	i.ladderPoller.Poll(time.Minute)
 
-	var pollList []characterpoller.PollCharacter
+	var pollList []*characterpoller.PollCharacter
 	var err error
 	var j int
 
@@ -60,15 +57,15 @@ func (i *ItemService) Init() error {
 	return nil
 }
 
-func (i *ItemService) getPollListFromLadder() ([]characterpoller.PollCharacter, error) {
-	var pollList []characterpoller.PollCharacter
+func (i *ItemService) getPollListFromLadder() ([]*characterpoller.PollCharacter, error) {
+	var pollList []*characterpoller.PollCharacter
 	if len(i.ladderPoller.Ladder.Entries) == 0 {
 		return nil, errors.New("no entries in ladder, cannot create poll list")
 	}
 	for _, entry := range i.ladderPoller.Ladder.Entries {
 		pollList = append(
 			pollList,
-			characterpoller.PollCharacter{
+			&characterpoller.PollCharacter{
 				AccountName:   entry.Account.Name,
 				CharacterName: entry.Character.Name,
 			},
@@ -78,34 +75,44 @@ func (i *ItemService) getPollListFromLadder() ([]characterpoller.PollCharacter, 
 }
 
 func (i *ItemService) search(c *gin.Context) {
-	// modSearch := c.Query("mod")
-	// typeSearch := c.Query("type")
-	// result := SearchResult{}
-	// character, err := i.poe.GetCharacterItems("Zizaran", "ZizaranSmarter")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// for _, item := range character.Items {
-	// 	if item.InventoryID == typeSearch || typeSearch == "" {
-	// 		for idx, mod := range item.ExplicitMods {
-	// 			if strings.Contains(mod, modSearch) {
-	// 				var resultItem = []struct {
-	// 					Type         string
-	// 					ExplicitMods []string
-	// 				}{{
-	// 					Type:         item.Type,
-	// 					ExplicitMods: item.ExplicitMods,
-	// 				}}
-	// 				result.Items = append(result.Items, resultItem...)
-	// 				fmt.Printf("%s -- %+v\n", item.Type, item.ExplicitMods[idx])
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// c.JSON(http.StatusOK, result)
-	result := fmt.Sprintf("Length of characters: %d", len(i.characterPoller.Characters))
-	c.String(http.StatusOK, result)
+	typeSearchString := c.Query("type")
+	modSearchString := c.Query("mod")
+	result := SearchResult{}
+	if typeSearchString != "" {
+		for _, cw := range i.characterPoller.Characters {
+			tsr := typeSearch(typeSearchString, cw.Items)
+			result.Items = append(result.Items, tsr...)
+		}
+	} else {
+		for _, cw := range i.characterPoller.Characters {
+			msr := modSearch(modSearchString, cw.Items)
+			result.Items = append(result.Items, msr...)
+		}
+	}
+	c.JSON(http.StatusOK, result)
 	return
+}
+
+func typeSearch(search string, items []characterpoller.Item) []characterpoller.Item {
+	var result []characterpoller.Item
+	for _, item := range items {
+		if strings.ToLower(item.InventoryID) == strings.ToLower(search) {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
+func modSearch(search string, items []characterpoller.Item) []characterpoller.Item {
+	var result []characterpoller.Item
+	for _, item := range items {
+		for _, mod := range item.ExplicitMods {
+			if strings.Contains(strings.ToLower(mod), strings.ToLower(search)) {
+				result = append(result, item)
+			}
+		}
+	}
+	return result
 }
 
 func (i *ItemService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
