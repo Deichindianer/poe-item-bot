@@ -15,6 +15,7 @@ import (
 
 type ItemService struct {
 	mux             *gin.Engine
+	characterCache  []characterpoller.Character
 	characterPoller *characterpoller.CharacterPoller
 	ladderPoller    *ladderpoller.LadderPoller
 }
@@ -36,7 +37,7 @@ func NewItemService(ladderName string, limit, offset int) *ItemService {
 func (i *ItemService) Init() error {
 	i.ladderPoller.Poll(time.Minute)
 
-	var pollList []*characterpoller.PollCharacter
+	var pollList []characterpoller.PollCharacter
 	var err error
 	var j int
 
@@ -57,15 +58,15 @@ func (i *ItemService) Init() error {
 	return nil
 }
 
-func (i *ItemService) getPollListFromLadder() ([]*characterpoller.PollCharacter, error) {
-	var pollList []*characterpoller.PollCharacter
+func (i *ItemService) getPollListFromLadder() ([]characterpoller.PollCharacter, error) {
+	var pollList []characterpoller.PollCharacter
 	if len(i.ladderPoller.Ladder.Entries) == 0 {
 		return nil, errors.New("no entries in ladder, cannot create poll list")
 	}
 	for _, entry := range i.ladderPoller.Ladder.Entries {
 		pollList = append(
 			pollList,
-			&characterpoller.PollCharacter{
+			characterpoller.PollCharacter{
 				AccountName:   entry.Account.Name,
 				CharacterName: entry.Character.Name,
 			},
@@ -78,13 +79,15 @@ func (i *ItemService) search(c *gin.Context) {
 	typeSearchString := c.Query("type")
 	modSearchString := c.Query("mod")
 	result := SearchResult{}
+	characterList := i.characterPoller.GetCharacters()
+
 	if typeSearchString != "" {
-		for _, cw := range i.characterPoller.Characters {
+		for _, cw := range characterList {
 			tsr := typeSearch(typeSearchString, cw.Items)
 			result.Items = append(result.Items, tsr...)
 		}
 	} else {
-		for _, cw := range i.characterPoller.Characters {
+		for _, cw := range characterList {
 			msr := modSearch(modSearchString, cw.Items)
 			result.Items = append(result.Items, msr...)
 		}

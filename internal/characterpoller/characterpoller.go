@@ -13,10 +13,12 @@ import (
 )
 
 type CharacterPoller struct {
-	PollList   []*PollCharacter
-	Characters []*CharacterWindow
-	ticker     *time.Ticker
+	PollList []PollCharacter
+	ticker   *time.Ticker
 	*api.Client
+
+	mut        sync.RWMutex
+	characters []CharacterWindow
 }
 
 type PollCharacter struct {
@@ -71,7 +73,7 @@ type Character struct {
 	Name       string `json:"name"`
 	League     string `json:"league"`
 	ClassID    int    `json:"classId"`
-	Ascendancy string `json:"ascendancyClass"`
+	Ascendancy int    `json:"ascendancyClass"`
 	Class      string `json:"class"`
 	Level      int    `json:"level"`
 	Experience int64  `json:"experience"`
@@ -79,11 +81,11 @@ type Character struct {
 }
 
 type refreshResult struct {
-	characterWindow *CharacterWindow
+	characterWindow CharacterWindow
 	err             error
 }
 
-func NewCharacterPoller(pollList []*PollCharacter) *CharacterPoller {
+func NewCharacterPoller(pollList []PollCharacter) *CharacterPoller {
 	client := api.New()
 	client.Scheme = "http"
 	client.Host = "www.pathofexile.com"
@@ -99,16 +101,10 @@ func (c *CharacterPoller) Poll(duration time.Duration) {
 		duration = time.Minute
 	}
 	c.ticker = time.NewTicker(duration)
-	if err := c.refreshAllCharacterItems(); err != nil {
-		log.Printf("got error: %s", err)
-		log.Println(err)
-	}
+	c.refreshAllCharacterItems()
 	go func() {
 		for range c.ticker.C {
-			if err := c.refreshAllCharacterItems(); err != nil {
-				log.Printf("got error: %s", err)
-				log.Println(err)
-			}
+			c.refreshAllCharacterItems()
 		}
 	}()
 }
@@ -117,54 +113,66 @@ func (c *CharacterPoller) StopPoll() {
 	c.ticker.Stop()
 }
 
-func (c *CharacterPoller) refreshAllCharacterItems() error {
+func (c *CharacterPoller) GetCharacters() []CharacterWindow {
+	chars := make([]CharacterWindow, 0)
+	c.mut.RLock()
+	defer c.mut.RUnlock()
+	chars = append(chars, c.characters...)
+	return chars
+}
+
+func (c *CharacterPoller) refreshAllCharacterItems() {
 	start := time.Now()
+	// var tmpCharacter
 	var wg sync.WaitGroup
-	charactersChan := make(chan *refreshResult, len(c.PollList))
+	var tmpCharacters []CharacterWindow
+	resultChannel := make(chan *refreshResult)
+	go func(resultChannel <-chan *refreshResult) {
+		for result := range resultChannel {
+			if result.err != nil {
+				log.Println(result.err)
+				continue
+			}
+			tmpCharacters = append(tmpCharacters, result.characterWindow)
+		}
+	}(resultChannel)
 	for _, pollItem := range c.PollList {
 		wg.Add(1)
-		go func(wg *sync.WaitGroup, pollItem *PollCharacter) {
-			c.getCharacterWindow(charactersChan, pollItem.AccountName, pollItem.CharacterName)
-			log.Println("Got the characterWindow")
+		go func(wg *sync.WaitGroup, pollItem PollCharacter) {
+			c.getCharacterWindow(resultChannel, pollItem.AccountName, pollItem.CharacterName)
 			wg.Done()
 		}(&wg, pollItem)
 	}
-	log.Println("Waiting for refreshCharacterWindow routines to finish")
 	wg.Wait()
-	log.Println("refreshCharacterWindow finished!")
-	close(charactersChan)
-	// for result := range charactersChan {
-	// 	if result.err != nil {
-	// 		log.Println(result.err)
-	// 		continue
-	// 	}
-	// 	c.Characters = append(c.Characters, result.characterWindow)
-	// }
+	close(resultChannel)
+	c.mut.Lock()
+	defer c.mut.Unlock()
+	c.characters = tmpCharacters
 	fmt.Printf("Duration of RefreshAllCharacterItems: %s\n", time.Since(start))
-	return nil
 }
 
 func (c *CharacterPoller) getCharacterWindow(rc chan<- *refreshResult, accountName, characterName string) {
+	var characterWindow CharacterWindow
 	query := url.Values{}
 	query.Set("character", characterName)
 	query.Set("accountName", accountName)
 	response, err := c.CallAPI("character-window/get-items", query.Encode())
 	if err != nil {
-		log.Printf("got error: %s", err)
-		rc <- &refreshResult{nil, err}
+		log.Printf("failed to call API: %s", err)
+		rc <- &refreshResult{characterWindow, err}
 	}
 	responseBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Printf("got error: %s", err)
-		rc <- &refreshResult{nil, err}
+		log.Printf("failed to read body: %s", err)
+		rc <- &refreshResult{characterWindow, err}
 	}
-	var characterWindow CharacterWindow
+
 	err = json.Unmarshal(responseBytes, &characterWindow)
 	if err != nil {
-		log.Printf("got error: %s", err)
-		rc <- &refreshResult{nil, err}
+		log.Printf("failed to unmarshal characterWindow: %s", err)
+		rc <- &refreshResult{characterWindow, err}
 	}
 	characterWindow.AccountName = accountName
 	log.Printf("char window successfully pulled, seding to channel")
-	rc <- &refreshResult{&characterWindow, nil}
+	rc <- &refreshResult{characterWindow, nil}
 }
