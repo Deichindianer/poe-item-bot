@@ -2,12 +2,12 @@ package itemservice
 
 import (
 	"errors"
-	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/Deichindianer/poe-item-bot/internal/characterpoller"
 	"github.com/Deichindianer/poe-item-bot/internal/ladderpoller"
@@ -29,6 +29,7 @@ func NewItemService(ladderName string, limit, offset int) *ItemService {
 	i := new(ItemService)
 	i.characterPoller = characterpoller.NewCharacterPoller(nil)
 	i.ladderPoller = ladderpoller.NewLadderPoller(ladderName, limit, offset)
+	gin.SetMode(gin.ReleaseMode)
 	i.mux = gin.New()
 	i.mux.GET("/search", i.search)
 	return i
@@ -50,7 +51,7 @@ func (i *ItemService) Init() error {
 		time.Sleep(50 * time.Millisecond)
 	}
 	i.characterPoller.PollList = pollList
-	log.Printf("PollList: %+v\n", i.characterPoller.PollList)
+	log.Debugf("PollList: %+v\n", i.characterPoller.PollList)
 	if len(i.characterPoller.PollList) == 0 {
 		return errors.New("character poller did not get a poll list")
 	}

@@ -1,11 +1,20 @@
 package main
 
 import (
-	"log"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/Deichindianer/poe-item-bot/internal/itemservice"
 )
+
+func init() {
+	log.SetLevel(log.DebugLevel)
+	log.SetReportCaller(true)
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+}
 
 func main() {
 	is := itemservice.NewItemService("SSF Ritual HC", 45, 0)

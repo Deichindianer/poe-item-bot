@@ -2,12 +2,12 @@ package characterpoller
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"log"
 	"net/url"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/Deichindianer/poe-item-bot/pkg/api"
 )
@@ -148,7 +148,7 @@ func (c *CharacterPoller) refreshAllCharacterItems() {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 	c.characters = tmpCharacters
-	fmt.Printf("Duration of RefreshAllCharacterItems: %s\n", time.Since(start))
+	log.Debugf("Duration of RefreshAllCharacterItems: %s\n", time.Since(start))
 }
 
 func (c *CharacterPoller) getCharacterWindow(rc chan<- *refreshResult, accountName, characterName string) {
