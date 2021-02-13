@@ -22,7 +22,12 @@ type ItemService struct {
 
 type SearchResult struct {
 	Metadata interface{}
-	Items    []characterpoller.Item
+	Result   []Match
+}
+
+type Match struct {
+	AccountName string
+	Items       []characterpoller.Item
 }
 
 func NewItemService(ladderName string, limit, offset int) *ItemService {
@@ -84,13 +89,19 @@ func (i *ItemService) search(c *gin.Context) {
 
 	if typeSearchString != "" {
 		for _, cw := range characterList {
+			var match Match
+			match.AccountName = cw.AccountName
 			tsr := typeSearch(typeSearchString, cw.Items)
-			result.Items = append(result.Items, tsr...)
+			match.Items = tsr
+			result.Result = append(result.Result, match)
 		}
 	} else {
 		for _, cw := range characterList {
+			var match Match
+			match.AccountName = cw.AccountName
 			msr := modSearch(modSearchString, cw.Items)
-			result.Items = append(result.Items, msr...)
+			match.Items = msr
+			result.Result = append(result.Result, match)
 		}
 	}
 	c.JSON(http.StatusOK, result)
