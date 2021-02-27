@@ -26,7 +26,7 @@ type SearchResult struct {
 
 type Match struct {
 	AccountName string
-	Items       []characterpoller.Item
+	Items       []interface{}
 }
 
 func NewItemService(ladderName string, limit, offset int) *ItemService {
@@ -36,6 +36,7 @@ func NewItemService(ladderName string, limit, offset int) *ItemService {
 	gin.SetMode(gin.ReleaseMode)
 	i.mux = gin.New()
 	i.mux.GET("/search", i.search)
+	i.mux.GET("/newsearch", i.newSearch)
 	return i
 }
 
