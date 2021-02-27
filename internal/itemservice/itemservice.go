@@ -3,6 +3,7 @@ package itemservice
 import (
 	"errors"
 	"net/http"
+	"net/http/pprof"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,11 @@ func NewItemService(ladderName string, limit, offset int) *ItemService {
 	i.mux = gin.New()
 	i.mux.GET("/search", i.search)
 	i.mux.GET("/newsearch", i.newSearch)
+	i.mux.GET("/debug/pprof/", gin.WrapF(pprof.Index))
+	i.mux.GET("/debug/pprof/cmdline", gin.WrapF(pprof.Cmdline))
+	i.mux.GET("/debug/pprof/profile", gin.WrapF(pprof.Profile))
+	i.mux.GET("/debug/pprof/symbol", gin.WrapF(pprof.Symbol))
+	i.mux.GET("/debug/pprof/trace", gin.WrapF(pprof.Trace))
 	return i
 }
 

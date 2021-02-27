@@ -5,6 +5,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	_ "net/http/pprof"
+
 	"github.com/Deichindianer/poe-item-bot/internal/itemservice"
 )
 

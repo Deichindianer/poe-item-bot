@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,6 +174,12 @@ func (c *CharacterPoller) getCharacterWindow(rc chan<- *refreshResult, accountNa
 		rc <- &refreshResult{characterWindow, err}
 	}
 	characterWindow.AccountName = accountName
+	for idx, item := range characterWindow.Items {
+		for i, mod := range item.ExplicitMods {
+			item.ExplicitMods[i] = strings.ToLower(mod)
+		}
+		characterWindow.Items[idx] = item
+	}
 	log.Printf("char window successfully pulled, seding to channel")
 	rc <- &refreshResult{characterWindow, nil}
 }

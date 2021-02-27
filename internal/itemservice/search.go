@@ -75,8 +75,9 @@ func (i *ItemService) search(c *gin.Context) {
 			}
 		}
 	} else if modSearchString != "" {
+		modSearchStringLower := strings.ToLower(modSearchString)
 		for _, cw := range characterList {
-			msr := modSearch(modSearchString, cw.Items)
+			msr := modSearch(modSearchStringLower, cw.Items)
 			if msr != nil {
 				var match Match
 				match.AccountName = cw.AccountName
@@ -96,7 +97,7 @@ func (i *ItemService) search(c *gin.Context) {
 	// 		}
 	// 	}
 	// }
-	c.JSON(http.StatusOK, result)
+	c.String(http.StatusOK, result)
 	return
 }
 
@@ -134,7 +135,7 @@ func modSearch(search string, items []characterpoller.Item) []interface{} {
 	var result []interface{}
 	for _, item := range items {
 		for _, mod := range item.ExplicitMods {
-			if strings.Contains(strings.ToLower(mod), strings.ToLower(search)) {
+			if strings.Contains(mod, search) {
 				result = append(result, item)
 			}
 		}
